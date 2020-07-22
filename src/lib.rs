@@ -4,7 +4,11 @@
 //! [Jerome Kelleher](http://jeromekelleher.net/generating-integer-partitions.html),
 //! which takes a constant amount of time for each partition.
 
+extern crate streaming_iterator;
+pub use streaming_iterator::StreamingIterator;
+
 /// Iterates over the partitions of a given positive integer.
+#[derive(Debug)]
 pub struct Partitions {
     a: Vec<usize>,
     k: usize,
@@ -12,6 +16,7 @@ pub struct Partitions {
     next: State,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 enum State {
     A,
     B { x: usize, l: usize },
@@ -21,17 +26,86 @@ impl Partitions {
     /// Makes a new iterator.
     #[inline]
     pub fn new(n: usize) -> Partitions {
+		if n == 0 {
+			return Partitions {
+				a: vec!(1),
+				k: 0,
+				y: 0,
+				next: State::A,
+			}
+		}
         Partitions {
             a: vec![0; n + 1],
-            k: if n == 0 { 0 } else { 1 },
-            y: if n == 0 { 0 } else { n - 1 },
+            k: 1,
+            y: n - 1,
             next: State::A,
         }
     }
 
-    /// Advances the iterator and returns the next partition.
+    /// Makes a new iterator, trying to avoid allocations.
+    ///
+    /// Any vector can be passed to this function, since its contents
+    /// will be cleared and it will be filled with zeroes, but note
+    /// that the vector will still reallocate if its capacity is less
+    /// than `n + 1`.
     #[inline]
-    pub fn next(&mut self) -> Option<&[usize]> {
+    pub fn recycle(n: usize, mut vec: Vec<usize>) -> Partitions {
+        vec.clear();
+		
+		if n == 0 {
+			vec.push(1);
+			return Partitions {
+				a: vec,
+				k: 0,
+				y: 0,
+				next: State::A,
+			}
+		}
+		
+        vec.reserve(n + 1);
+        for _ in 0..(n + 1) {
+            vec.push(0);
+        }
+
+        Partitions {
+            a: vec,
+            k: 1,
+            y: n - 1,
+            next: State::A,
+        }
+    }
+
+    /// Destroys the iterator and returns a vector for further use.
+    ///
+    /// You only need to call this function if you want to reuse the
+    /// vector for something else. Its contents will be in an undefined
+    /// state, and so cannot be relied upon.
+    #[inline]
+    pub fn end(self) -> Vec<usize> {
+        self.a
+    }
+}
+
+impl StreamingIterator for Partitions {
+    type Item = [usize];
+
+    fn get(&self) -> Option<&Self::Item> {
+        if self.next == State::A && self.k == 0 && (self.a[0] == 0 || self.a.len() == 1) {
+			if self.a[0] == 0 {
+				None
+			} else {
+				Some(&[])
+			}
+		} else {
+			Some(&self.a[..self.k + match self.next {
+				State::A => 1,
+				State::B { .. } => 2,
+			}])
+		}
+    }
+
+    #[inline]
+    fn advance(&mut self) {
         let Partitions {
             ref mut a,
             ref mut k,
@@ -42,11 +116,10 @@ impl Partitions {
         match *next {
             State::A => {
                 if *k == 0 {
-                    if a.len() == 1 {
-                        a.pop();
-                        Some(&[])
+                    if a.len() == 1 && a[0] == 1 {
+                        a[0] = 2;
                     } else {
-                        None
+						a[0] = 0;
                     }
                 } else {
                     *k -= 1;
@@ -64,11 +137,9 @@ impl Partitions {
                         a[*k] = x;
                         a[l] = *y;
                         *next = State::B { x, l };
-                        Some(&a[..*k + 2])
                     } else {
                         a[*k] = x + *y;
                         *y = x + *y - 1;
-                        Some(&a[..*k + 1])
                     }
                 }
             },
@@ -80,47 +151,13 @@ impl Partitions {
                     a[*k] = x;
                     a[l] = *y;
                     *next = State::B { x, l };
-                    Some(&a[..*k + 2])
                 } else {
                     a[*k] = x + *y;
                     *y = x + *y - 1;
                     *next = State::A;
-                    Some(&a[..*k + 1])
                 }
             },
         }
-    }
-
-    /// Makes a new iterator, trying to avoid allocations.
-    ///
-    /// Any vector can be passed to this function, since its contents
-    /// will be cleared and it will be filled with zeroes, but note
-    /// that the vector will still reallocate if its capacity is less
-    /// than `n + 1`.
-    #[inline]
-    pub fn recycle(n: usize, mut vec: Vec<usize>) -> Partitions {
-        vec.clear();
-        vec.reserve(n + 1);
-        for _ in 0..(n + 1) {
-            vec.push(0);
-        }
-
-        Partitions {
-            a: vec,
-            k: if n == 0 { 0 } else { 1 },
-            y: if n == 0 { 0 } else { n - 1 },
-            next: State::A,
-        }
-    }
-
-    /// Destroys the iterator and returns a vector for further use.
-    ///
-    /// You only need to call this function if you want to reuse the
-    /// vector for something else. Its contents will be in an undefined
-    /// state, and so cannot be relied upon.
-    #[inline]
-    pub fn end(self) -> Vec<usize> {
-        self.a
     }
 }
 
@@ -138,7 +175,7 @@ fn oeis() {
         173525,
     ];
 
-    for (i, &n) in tests.iter().enumerate() {
+    for (i, &n) in tests.iter().enumerate().skip(1) {
         let mut p = Partitions::new(i);
         let mut c = 0;
 
@@ -150,4 +187,13 @@ fn oeis() {
 
         assert_eq!(c, n);
     }
+}
+
+#[test]
+fn n0() {
+	//! Tests the special case n == 0.
+
+	let mut p = Partitions::new(0);
+	assert_eq!(p.next().unwrap().len(), 0);
+	assert_eq!(p.next(), None);
 }
