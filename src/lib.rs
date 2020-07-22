@@ -37,14 +37,14 @@ impl Partitions {
     /// Makes a new iterator.
     #[inline]
     pub fn new(n: usize) -> Partitions {
-		if n == 0 {
-			return Partitions {
-				a: vec!(1),
-				k: 0,
-				y: 0,
-				next: State::A,
-			}
-		}
+        if n == 0 {
+            return Partitions {
+                a: vec!(1),
+                k: 0,
+                y: 0,
+                next: State::A,
+            }
+        }
         Partitions {
             a: vec![0; n + 1],
             k: 1,
@@ -56,7 +56,7 @@ impl Partitions {
     /// Advances the iterator and returns the next partition.
     #[inline]
     pub fn next(&mut self) -> Option<&[usize]> {
-		StreamingIterator::next(self)
+        StreamingIterator::next(self)
     }
 
     /// Makes a new iterator, trying to avoid allocations.
@@ -68,17 +68,17 @@ impl Partitions {
     #[inline]
     pub fn recycle(n: usize, mut vec: Vec<usize>) -> Partitions {
         vec.clear();
-		
-		if n == 0 {
-			vec.push(1);
-			return Partitions {
-				a: vec,
-				k: 0,
-				y: 0,
-				next: State::A,
-			}
-		}
-		
+        
+        if n == 0 {
+            vec.push(1);
+            return Partitions {
+                a: vec,
+                k: 0,
+                y: 0,
+                next: State::A,
+            }
+        }
+        
         vec.reserve(n + 1);
         for _ in 0..(n + 1) {
             vec.push(0);
@@ -108,17 +108,17 @@ impl StreamingIterator for Partitions {
 
     fn get(&self) -> Option<&Self::Item> {
         if self.next == State::A && self.k == 0 && (self.a[0] == 0 || self.a.len() == 1) {
-			if self.a[0] == 0 {
-				None
-			} else {
-				Some(&[])
-			}
-		} else {
-			Some(&self.a[..self.k + match self.next {
-				State::A => 1,
-				State::B { .. } => 2,
-			}])
-		}
+            if self.a[0] == 0 {
+                None
+            } else {
+                Some(&[])
+            }
+        } else {
+            Some(&self.a[..self.k + match self.next {
+                State::A => 1,
+                State::B { .. } => 2,
+            }])
+        }
     }
 
     #[inline]
@@ -136,7 +136,7 @@ impl StreamingIterator for Partitions {
                     if a.len() == 1 && a[0] == 1 {
                         a[0] = 2;
                     } else {
-						a[0] = 0;
+                        a[0] = 0;
                     }
                 } else {
                     *k -= 1;
@@ -208,9 +208,9 @@ fn oeis() {
 
 #[test]
 fn n0() {
-	//! Tests the special case n == 0.
+    //! Tests the special case n == 0.
 
-	let mut p = Partitions::new(0);
-	assert_eq!(p.next().unwrap().len(), 0);
-	assert_eq!(p.next(), None);
+    let mut p = Partitions::new(0);
+    assert_eq!(p.next().unwrap().len(), 0);
+    assert_eq!(p.next(), None);
 }
