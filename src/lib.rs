@@ -3,11 +3,22 @@
 //! This is an implementation of a method described by
 //! [Jerome Kelleher](http://jeromekelleher.net/generating-integer-partitions.html),
 //! which takes a constant amount of time for each partition.
+//!
+//! # Examples
+//!
+//! ```
+//! use integer_partitions::Partitions;
+//!
+//! let mut pp = Partitions::new(5);
+//! while let Some(p) = pp.next() {
+//!     println!("{:?}", p)
+//! }
+//! ```
 
-extern crate streaming_iterator;
-pub use streaming_iterator::StreamingIterator;
+pub extern crate streaming_iterator;
+use streaming_iterator::StreamingIterator;
 
-/// Iterates over the partitions of a given positive integer.
+/// Iterates over the partitions of a given nonnegative integer.
 #[derive(Debug)]
 pub struct Partitions {
     a: Vec<usize>,
@@ -40,6 +51,12 @@ impl Partitions {
             y: n - 1,
             next: State::A,
         }
+    }
+
+    /// Advances the iterator and returns the next partition.
+    #[inline]
+    pub fn next(&mut self) -> Option<&[usize]> {
+		StreamingIterator::next(self)
     }
 
     /// Makes a new iterator, trying to avoid allocations.
